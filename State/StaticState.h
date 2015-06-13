@@ -55,6 +55,7 @@
 //#include "netcdfcpp.h"
 #include "../Resources/MersenneTwister.h"
 #include "../Resources/RNG_taus.h"
+#include <time.h>
 
 namespace LiuJamming
 {
@@ -382,7 +383,6 @@ CStaticState<Dim> &CStaticState<Dim>::operator=(CStaticState<Dim> const &copy)
 }
 
 
-
 template <int Dim>
 void CStaticState<Dim>::SetPotential(CPotential *t_Potential)
 {
@@ -694,6 +694,24 @@ void CStaticState<Dim>::SetRadiiPolyUniform(dbl SizeRatio)
 	}
 	dbl avgD = 2.*Radii.mean();
 	Radii *= sigma/avgD;
+
+	
+	srand(time(0));
+	const int maximum = RAND_MAX - (RAND_MAX % N);
+
+	for(int i = 0 ; i < N; i++)
+	{
+		double temp = Radii[i];
+		int j;
+		do
+		{
+			j = rand();
+		} while (j > maximum);
+
+		j %= N;
+		Radii[i] = Radii[j];
+		Radii[j] = temp;
+	}
 }
 
 

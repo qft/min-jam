@@ -1,7 +1,6 @@
-#DIR = /data0/home/cpgoodri/jcode/ssdirectional/jsrc
-DIR = /home/cpgoodri/jsrc
+DIR = /home/consha/Polycrystals/jsrc
 
-name=test3
+name=MikeTemp
 obj=$(name).o
 
 #define some computer names
@@ -28,13 +27,13 @@ $(patsubst %,$(prjDIR)/%,$(prjOBJGQS))
 
 
 .f.o: 
-	$(FRULE)
+	$(FRULE) -fopenmp
 
 .cpp.o: 
-	$(CRULE)
+	$(CRULE) -fopenmp
 
 $(name).out: $(OBJGQS)
-	$(ORULE)
+	$(ORULE) -fopenmp
 
 #if any header file is changed, the project file gets recompiled.
 $(obj): $(StandardDependencies)

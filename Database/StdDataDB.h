@@ -27,7 +27,7 @@ class CStdDataDatabase : public CDatabase
 private:
 	typedef CStdData<Dim> DATA;
 	NcDim *recDim, *dm2Dim, *NcijklDim;
-	NcVar *NPpVar, *NcVar, *VolumeVar, *EnergyVar, *PressureVar, *StressVar, *FabricVar, *MaxGradVar, *CijklVar;
+	NcVar *NPpVar, *NcVar, *VolumeVar, *EnergyVar, *PressureVar, *StressVar, *FabricVar, *MaxGradVar, *CijklVar, *Psi6Var;
 
 public:
 	CStdDataDatabase(string fn="temp.nc", NcFile::FileMode mode=NcFile::ReadOnly);
@@ -94,6 +94,7 @@ void CStdDataDatabase<Dim>::SetDimVar()
 	FabricVar	= File.add_var("Fabric",	ncDouble,	recDim, dm2Dim);
 	MaxGradVar	= File.add_var("MaxGrad",	ncDouble,	recDim);
 	CijklVar	= File.add_var("Cijkl",		ncDouble,	recDim, NcijklDim);
+	Psi6Var		= File.add_var("Psi6Mag",       ncDouble,       recDim);
 }
 
 template <int Dim>
@@ -116,6 +117,7 @@ void CStdDataDatabase<Dim>::GetDimVar()
 	FabricVar	= File.get_var("Fabric");
 	MaxGradVar	= File.get_var("MaxGrad");
 	CijklVar	= File.get_var("Cijkl");
+	Psi6Var 	= File.get_var("Psi6Mag");
 }
 
 template <int Dim>
@@ -139,6 +141,7 @@ void CStdDataDatabase<Dim>::Write(DATA const &data, int rec)
 	FabricVar	->put_rec(data.Fabric.data(),	rec);
 	MaxGradVar	->put_rec(&data.MaxGrad,		rec);
 	CijklVar	->put_rec(&data.cijkl.a[0],		rec);
+	Psi6Var		->put_rec(&data.Psi6Mag, 		rec);
 
 	File.sync();
 }
@@ -171,6 +174,7 @@ void CStdDataDatabase<Dim>::Read(DATA &data, int rec)
 	FabricVar	-> set_cur(rec);
 	MaxGradVar	-> set_cur(rec);
 	CijklVar	-> set_cur(rec);
+	Psi6Var		-> set_cur(rec);
 
 	NPpVar		-> get(&data.NPp,			1);
 	NcVar		-> get(&data.Nc,			1);
@@ -181,6 +185,7 @@ void CStdDataDatabase<Dim>::Read(DATA &data, int rec)
 	FabricVar	-> get(data.Fabric.data(),	1, dm2Dim->size());
 	MaxGradVar	-> get(&data.MaxGrad,		1);
 	CijklVar	-> get(&data.cijkl.a[0],	1, NcijklDim->size());
+	Psi6Var		-> get(&data.Psi6Mag, 		1);	
 
 }
 

@@ -17,7 +17,7 @@ FF=ifort
 #Compiler flags
 I_ACCURACY_FLAGS = -fp-model precise -prec-div -prec-sqrt
 I_OPTIMIZATION_FLAGS = -O3 -xhost -ipo
-FLAGS = $(I_OPTIMIZATION_FLAGS) $(I_ACCURACY_FLAGS) #-opt-report-file opt_report.txt
+FLAGS = $(I_OPTIMIZATION_FLAGS) $(I_ACCURACY_FLAGS)#-opt-report-file opt_report.txt
 FFLAGS = $(FLAGS)
 CFLAGS = $(FLAGS) -wr1125 -wr2196 -wr2536 #-wr21 -wr279 -wr1125 #-wr418 
 LinkFLAGS = $(FLAGS)

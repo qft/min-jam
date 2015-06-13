@@ -21,6 +21,7 @@ public:
 	dmat Stress;	//!<The stress tensor
 	dmat Fabric;	//!<The fabric tensor
 	dbl MaxGrad;
+	dbl Psi6Mag; 	//!<Magnitude of psi6 summed over system
 
 	cCIJKL<Dim> cijkl;
 	MatrixInterface<dbl> H;
@@ -38,7 +39,7 @@ public:
 	void SetZero()
 	{
 		NPp = Nc = 0;
-		Volume = Energy = Pressure = MaxGrad = 0.;
+		Volume = Energy = Pressure = MaxGrad = Psi6Mag = 0.;
 		Stress = dmat::Zero();
 		Fabric = dmat::Zero();
 		cijkl.SetZero();
@@ -58,6 +59,7 @@ public:
 		printf("\tPressure    = % e\n", Pressure);
 		printf("\tMaxGrad     = % e\n", MaxGrad);
 		printf("\tStress Tensor: \n");
+		printf("\tPsi6Mag     = % e\n", Psi6Mag);
 		for(int d1=0; d1<Dim; ++d1)
 		{
 			printf("\t             ");

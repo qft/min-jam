@@ -113,6 +113,7 @@ public:
 	void CalculateStdData(CStdData<Dim> &data, bool CalcCijkl=true, bool CalcHess = true);
 	void CalculateStdData_Unstressed(bool CalcCijkl=true, bool CalcHess = true);
 	void CalculateStdData_Unstressed(CStdData<Dim> &data, bool CalcCijkl=true, bool CalcHess = true);
+	void CalculatePsi6Mag(vector< vector<double> > &psi6p);
 
 //Compute Hessian
 	void ComputeHessian(Eigen::SparseMatrix<dbl> &hess) const;
@@ -136,7 +137,7 @@ public:
 };
 
 /////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////   IMPLEMENTATION    //////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////
@@ -259,25 +260,37 @@ void CStaticComputer<Dim>::ComputeBondList_Grid(CBondList<Dim> &bonds)
 	//Grid.PrintGrid();
 
 	bonds.SetN(State.GetParticleNumber());
-	dvec Displacement;
-	dbl sigma, rlen, rlen2, E, g, k;
-	for(int i = 0 ; i < State.GetParticleNumber() ; i++)
+
+
+#pragma omp parallel
 	{
-		for(typename CGrid<Dim>::iterator it = Grid.GetParticleIterator(i) ; (*it)!=-1 ; it++) //(*it) is the particle index of a potential neighbor
+		vector< CBond<2> > temp;
+		dvec Displacement;
+		dbl sigma, rlen, rlen2, E, g, k;
+#pragma omp for
+		for(int i = 0 ; i < State.GetParticleNumber() ; i++)
 		{
-			if((*it)>i)
+			for(typename CGrid<Dim>::iterator it = Grid.GetParticleIterator(i) ; (*it)!=-1 ; it++) //(*it) is the particle index of a potential neighbor
 			{
-				State.GetDisplacement(i,(*it),Displacement);
-				rlen2 = Displacement.squaredNorm();
-				if(State.GetPotential()->Overlapping(State.GetRadius(i),State.GetRadius((*it)), rlen2, sigma))
+				if((*it)>i)
 				{
-					rlen = sqrt(rlen2);
-					State.GetPotential()->ComputeDerivatives012(rlen, sigma, E, g, k);
-					bonds.AddBond( CBond<Dim>(i, (*it), rlen, E, g, k, Displacement) );
+					State.GetDisplacement(i,(*it),Displacement);
+					rlen2 = Displacement.squaredNorm();
+					if(State.GetPotential()->Overlapping(State.GetRadius(i),State.GetRadius((*it)), rlen2, sigma))
+					{
+						rlen = sqrt(rlen2);
+						State.GetPotential()->ComputeDerivatives012(rlen, sigma, E, g, k);		
+						temp.push_back( CBond<Dim>(i, (*it), rlen, E, g, k, Displacement) );
+					}
 				}
 			}
 		}
+
+#pragma omp critical
+		for (int i = 0; i < temp.size(); i++) bonds.AddBond(CBond<Dim>(temp[i]));
 	}
+
+
 	bonds.SetVolume(GetVolume());
 }
 
@@ -287,21 +300,32 @@ void CStaticComputer<Dim>::ComputeBondList_NoGrid(CBondList<Dim> &bonds) const
 	//Make sure bonds is empty.
 	bonds.RemoveAllBonds();
 
-	dvec Displacement;
 	bonds.SetN(State.GetParticleNumber());
-	dbl sigma, rlen, rlen2, E, g, k;
-	for(int i = 0 ; i < State.GetParticleNumber()-1 ; i++)
-		for(int j = i+1 ; j < State.GetParticleNumber() ; j++)
+
+#pragma omp parallel
+	{
+		vector< CBond<2> > temp;
+		dvec Displacement;
+		dbl sigma, rlen, rlen2, E, g, k;
+#pragma omp for
+		for(int i = 0 ; i < State.GetParticleNumber()-1 ; i++)
 		{
-			State.GetDisplacement(i,j,Displacement);
-			rlen2 = Displacement.squaredNorm();
-			if(State.GetPotential()->Overlapping(State.GetRadius(i),State.GetRadius(j), rlen2, sigma))
+			for(int j = i+1 ; j < State.GetParticleNumber() ; j++)
 			{
-				rlen = sqrt(rlen2);
-				State.GetPotential()->ComputeDerivatives012(rlen, sigma, E, g, k);
-				bonds.AddBond( CBond<Dim>(i, j, rlen, E, g, k, Displacement) );
+				State.GetDisplacement(i,j,Displacement);
+				rlen2 = Displacement.squaredNorm();
+				if(State.GetPotential()->Overlapping(State.GetRadius(i),State.GetRadius(j), rlen2, sigma))
+				{
+					rlen = sqrt(rlen2);
+					State.GetPotential()->ComputeDerivatives012(rlen, sigma, E, g, k);
+					bonds.AddBond( CBond<Dim>(i, j, rlen, E, g, k, Displacement) );
+				}
 			}
 		}
+
+#pragma omp critical
+		for (int i = 0; i < temp.size(); i++) bonds.AddBond(CBond<Dim>(temp[i]));
+	}
 	bonds.SetVolume(GetVolume());
 }
 
@@ -365,7 +389,113 @@ void CStaticComputer<Dim>::CalculateStdData_Unstressed(CStdData<Dim> &data, bool
 }
 
 
+template <int Dim>
+void CStaticComputer<Dim>::CalculatePsi6Mag(vector< vector<double> > &psi6p)
+{
+	const int N = State.GetParticleNumber();
+	for (int i = 0; i < N; i++)
+	{
+		vector<double> temp;
+		temp.push_back(0);
+		temp.push_back(0);
+		psi6p.push_back(temp);
+	}
 
+	double Psi6R = 0., Psi6I = 0.;
+
+	double volume = State.GetBox()->CalculateVolume();
+	volume = sqrt(volume);
+	static const double a = volume / sqrt(N * sqrt(3.0) / 2.0);
+#pragma omp parallel 
+	{
+		Eigen::VectorXd pos;
+#pragma omp critical
+		State.GetPositions(pos);
+
+
+		vector< vector<double> > psi6ptemp;
+		for (int i = 0; i < N; i++)
+		{
+			vector<double> temp;
+			temp.push_back(0);
+			temp.push_back(0);
+			temp.push_back(0);
+			psi6ptemp.push_back(temp);
+		}
+
+		double Psi6Rtemp = 0., Psi6Itemp = 0.;
+#pragma omp for
+		for (int i = 0; i < N; i++)
+		{
+			double Psi6RP = 0., Psi6IP = 0.;			
+			double radius = 1.5 * a;
+			radius *= radius;
+			double x, y;
+			for (int j = i + 1; j < N; j++)
+			{
+				x = pos[2 * j] - pos[2 * i];
+				y = pos[2 * j + 1] - pos[2 * i + 1];
+
+				for (int xinc = 0; xinc < 2; xinc++)
+				{
+					for(int yinc = 0; yinc < 2; yinc++)
+					{
+						double dx = x + xinc;
+						double dy = y + yinc;
+						double l = dx * dx + dy * dy;
+						if (l < radius)
+						{
+							double norm = sqrt(l);
+							// take reference direction to be x-hat
+							double cosTheta = dx / norm;
+							cosTheta = cos(6 * acos(cosTheta));
+							Psi6RP += cosTheta;
+							// our favorite trig formula, from pythagoras
+							Psi6IP += sqrt(1 - cosTheta * cosTheta);
+							psi6ptemp[i][2] += 1;
+						}
+					}
+				}
+			}	
+
+
+			psi6ptemp[i][0] = Psi6RP;
+			psi6ptemp[i][1] = Psi6IP;
+
+		}
+
+		for (int i = 0; i < N; i++)
+		{
+			int nNeighbors = psi6ptemp[i][2];
+			if (nNeighbors > 0)
+			{
+				psi6ptemp[i][0] /= nNeighbors;
+				psi6ptemp[i][1] /= nNeighbors;
+			}
+		}
+
+
+
+#pragma omp critical
+		{
+			Psi6R += Psi6Rtemp;
+			Psi6I += Psi6Itemp;
+			for (int i = 0; i < State.GetParticleNumber(); i++)
+			{
+				if (psi6ptemp[i][2] > 0)
+					for (int d = 0; d < 2; d++)
+						psi6p[i][d] = psi6ptemp[i][d];
+			}
+		}
+	}
+
+
+	int nBonds2 = 2 * Bonds.GetNBonds();
+	Psi6R /= nBonds2;
+	Psi6I /= nBonds2;
+	double Psi6Mag = sqrt(Psi6R * Psi6R + Psi6I * Psi6I);
+	Data.Psi6Mag = Psi6Mag;
+}
 
 
 

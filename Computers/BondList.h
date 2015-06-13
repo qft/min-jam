@@ -195,7 +195,7 @@ void CBondList<Dim>::SetN(int _N)
 template<int Dim>
 int CBondList<Dim>::GetN() const
 {
-	return N;
+	return list.size();
 }
 
 template<int Dim>
